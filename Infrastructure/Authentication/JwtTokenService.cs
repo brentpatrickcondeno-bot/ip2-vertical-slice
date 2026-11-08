@@ -17,13 +17,11 @@ public sealed class JwtTokenService(
     public string GenerateAccessToken(ApplicationUser user)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
-
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            // FIX: the lab forgets "iat", but logout-all depends on it
             new(JwtRegisteredClaimNames.Iat,
                 new DateTimeOffset(now).ToUnixTimeSeconds().ToString(),
                 ClaimValueTypes.Integer64),
@@ -36,7 +34,11 @@ public sealed class JwtTokenService(
             claims.Add(new Claim("student_id", user.StudentId.Value.ToString()));
         }
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
+        var signingKey = !string.IsNullOrWhiteSpace(_options.SigningKey) 
+            ? _options.SigningKey 
+            : "ThisIsADevelopmentOnlySigningKeyThatIsAtLeast32BytesLong!";
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(

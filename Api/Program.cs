@@ -1,3 +1,5 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using Api.Features.Admissions;
 using Api.Features.Auth;
@@ -67,7 +69,9 @@ builder.Services.AddScoped<IQueryHandler<GetAllAdmissionsQuery, Result<GetAllAdm
 builder.Services.AddScoped<ICommandHandler<RegisterCommand, Result<RegisterResponse>>, RegisterCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<LoginCommand, Result<LoginResponse>>, LoginCommandHandler>();
 
-// JWT validation
+builder.Services.AddHostedService<Infrastructure.BackgroundJobs.RevokedTokenCleanupService>();
+
+// JWT validation with revocation event
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -84,6 +88,34 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(jwtSection["SigningKey"]!)),
             ClockSkew = TimeSpan.FromSeconds(30)
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var dbContext = context.HttpContext.RequestServices.GetRequiredService<IAppDbContext>();
+                var jti = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Jti);
+                var sub = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                var iatRaw = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Iat);
+
+                if (jti is not null && await dbContext.RevokedTokens.AnyAsync(r => r.Jti == jti))
+                {
+                    context.Fail("Token has been revoked.");
+                    return;
+                }
+
+                if (sub is not null && Guid.TryParse(sub, out var userId) && iatRaw is not null
+                    && long.TryParse(iatRaw, out var iatUnix))
+                {
+                    var issuedAtUtc = DateTimeOffset.FromUnixTimeSeconds(iatUnix).UtcDateTime;
+                    var user = await dbContext.Users.FindAsync([userId]);
+                    if (user?.TokensValidFromUtc is { } validFrom && issuedAtUtc < validFrom)
+                    {
+                        context.Fail("Token was issued before the user's last sign-out-everywhere.");
+                    }
+                }
+            }
         };
     });
 
@@ -119,20 +151,17 @@ var app = builder.Build();
 
 await app.Services.MigrateAndSeedAsync();
 
-app.UseAuthentication();   // who are you?
-app.UseAuthorization();    // are you allowed?
+app.UseAuthentication();
+app.UseAuthorization();
 
-// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
 
-// Root endpoint
 app.MapGet("/", () => "Welcome to the Vertical Slice API! Go to /scalar/v1 for API documentation.");
 
-// Map endpoints
 app.MapStudentEndpoints();
 app.MapCourseEndpoints();
 app.MapAdmissionEndpoints();
