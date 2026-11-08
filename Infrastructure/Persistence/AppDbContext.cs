@@ -1,5 +1,4 @@
-namespace Infrastructure.Persistence;
-
+﻿namespace Infrastructure.Persistence;
 using Application.Abstractions.Data;
 using Domain.Entities;
 using Microsoft.EntityFrameworkCore;

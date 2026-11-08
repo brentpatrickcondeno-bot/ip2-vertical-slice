@@ -1,5 +1,4 @@
 ﻿namespace Application.Abstractions.Data;
-
 using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 

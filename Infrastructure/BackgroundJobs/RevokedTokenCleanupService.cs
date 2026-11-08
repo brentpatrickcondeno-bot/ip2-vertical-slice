@@ -1,5 +1,4 @@
 ﻿namespace Infrastructure.BackgroundJobs;
-
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

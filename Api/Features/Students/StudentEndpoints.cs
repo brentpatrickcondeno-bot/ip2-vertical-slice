@@ -1,3 +1,4 @@
+using Api.Common.Authorization;
 namespace Api.Features.Students;
 
 using Api.Common.Extensions;
@@ -16,15 +17,15 @@ public static class StudentEndpoints
         var group = app.MapGroup("/api/students")
             .WithTags("Students").RequireAuthorization();
 
-        group.MapGet("/", GetAll)
+        group.MapGet("/", GetAll).RequireAuthorization(Policies.CanManageStudents)
             .WithName("GetAllStudents")
             .WithSummary("Get all students");
 
-        group.MapPost("/", Create)
+        group.MapPost("/", Create).RequireAuthorization(Policies.CanManageStudents)
             .WithName("CreateStudent")
             .WithSummary("Create a new student");
 
-        group.MapGet("/{id:guid}", GetById)
+        group.MapGet("/{id:guid}", GetById).RequireAuthorization(Policies.CanManageStudents)
             .WithName(GetByIdRouteName)
             .WithSummary("Get student by ID");
     }

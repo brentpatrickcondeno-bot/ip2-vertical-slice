@@ -1,3 +1,4 @@
+using Api.Common.Authorization;
 namespace Api.Features.Courses;
 
 using Api.Common.Extensions;
@@ -22,7 +23,7 @@ public static class CourseEndpoints
             .WithName("GetAllCourses")
             .WithSummary("Get all courses");
 
-        group.MapPost("/", Create)
+        group.MapPost("/", Create).RequireAuthorization(Policies.CanManageCourses)
             .WithName("CreateCourse")
             .WithSummary("Create a new course");
 
@@ -30,7 +31,7 @@ public static class CourseEndpoints
             .WithName(GetByIdRouteName)
             .WithSummary("Get course by ID");
 
-        group.MapPut("/{id:guid}", Update)
+        group.MapPut("/{id:guid}", Update).RequireAuthorization(Policies.CanManageCourses)
             .WithName("UpdateCourse")
             .WithSummary("Update an existing course");
 
